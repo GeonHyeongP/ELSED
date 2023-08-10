@@ -4,6 +4,12 @@
 #include <ostream>
 #include <opencv2/opencv.hpp>
 
+
+#define UPM_ABS_DIR_CHECKER 1
+
+
+
+
 #define UPM_ABS(x) ((x) >= 0 ? (x) : -(x))
 
 #define UPM_EDGE_VERTICAL   0
@@ -80,6 +86,8 @@ typedef std::vector<ImageEdge> ImageEdges;
  */
 struct SalientSegment {
   Segment segment;
+  
+  ///@brief may I traust this segment?. salience will answer you. A range is 0 to 1
   double salience;
 
   SalientSegment() = default;
@@ -162,20 +170,28 @@ segLength(const Segment &s) {
   return std::sqrt(dx * dx + dy * dy);
 }
 
-/**
- * @brief Calculates the angle of a line segment
- * @param s The input segment
- * @return The angle that the segment forms with the X-axis in radians.
- * Range (pi/2, -pi/2].
- */
-inline float
-segAngle(const Segment &s) {
-  if (s[2] > s[0])
-    return std::atan2(s[3] - s[1], s[2] - s[0]);
-  else
-    return std::atan2(s[1] - s[3], s[0] - s[2]);
-}
-
+#if UPM_ABS_DIR_CHECKER == 1
+  template< typename T > 
+  T PI2PI( const T & angle )
+  {
+    if( angle >= M_PI )       return (angle-M_PI-M_PI);
+    else if( angle <= -M_PI ) return (angle+M_PI+M_PI);
+    else                      return angle;
+  }
+#else 
+  /**
+  * @brief Calculates the angle of a line segment
+  * @param s The input segment
+  * @return The angle that the segment forms with the X-axis in radians.
+  * Range (pi/2, -pi/2].
+  */
+  inline float
+  segAngle(const Segment &s) 
+  {
+    if (s[2] > s[0]) return std::atan2(s[3] - s[1], s[2] - s[0]);
+    else             return std::atan2(s[1] - s[3], s[0] - s[2]);
+  }
+#endif
 
 /**
  * Returns the line pixels using the Bresenham Algorithm:

@@ -117,8 +117,16 @@ class FullSegmentInfo {
   Pixel firstPx, prevFirstPx, lastPx, prevLastPx;
   // Indices of some pixels in the chain
   int firstPxIndex = -1, lastPxIndex = -1;
+  
+#if UPM_ABS_DIR_CHECKER == 1
+  // Relevance of the segment, we can not trust this when salience is zero
+  // A range should be 0 to 1
+  float salience = 0;
+#else 
   // Relevance of the segment
   float salience = -1;
+#endif
+  
   // Pointer to the chain of edge pixels
   const ImageEdge *pixels;
   // Indicates whenever the list of pixels from firstPxIndex to lastPxIndex is sorted

@@ -5,6 +5,7 @@
 // or if they are ready directly from the image
 #define UPM_SD_USE_REPROJECTION
 
+
 namespace upm {
 
 ELSED::ELSED(const ELSEDParams &params) : params(params) {
@@ -260,6 +261,7 @@ void ELSED::drawAnchorPoints(const uint8_t *dirImg,
   double theta, angle;
   float saliency;
   bool valid;
+  bool change_sp_ep;
   int endpointDist, nOriInliers, nOriOutliers;
 #ifdef UPM_SD_USE_REPROJECTION
   cv::Point2f p;
@@ -274,16 +276,26 @@ void ELSED::drawAnchorPoints(const uint8_t *dirImg,
   for (const FullSegmentInfo &detectedSeg: drawer->getDetectedFullSegments()) {
 
     valid = true;
-    if (params.validate) {
-      if (detectedSeg.getNumOfPixels() < 2) {
+    change_sp_ep = false;
+    if (params.validate) 
+    {
+      if( detectedSeg.getNumOfPixels() < 2 ) 
+      {
         valid = false;
-      } else {
+      } 
+      else 
+      {
         // Get the segment angle
         Segment s = detectedSeg.getEndpoints();
+
+#if UPM_ABS_DIR_CHECKER == 1        
+        theta = PI2PI( std::atan2( s[3]-s[1], s[2]-s[0] ) + M_PI_2 );
+#else 
         theta = segAngle(s) + M_PI_2;
         // Force theta to be in range [0, M_PI)
         while (theta < 0) theta += M_PI;
         while (theta >= M_PI) theta -= M_PI;
+#endif
 
         // Calculate the line equation as the cross product os the endpoints
         cv::Vec3f l = cv::Vec3f(s[0], s[1], 1).cross(cv::Vec3f(s[2], s[3], 1));
@@ -300,6 +312,7 @@ void ELSED::drawAnchorPoints(const uint8_t *dirImg,
         nOriInliers = 0;
         nOriOutliers = 0;
 
+        std::vector<float> grad_samples;
         for (auto px: detectedSeg) {
 
           // If the point is not an inlier avoid it
@@ -342,22 +355,99 @@ void ELSED::drawAnchorPoints(const uint8_t *dirImg,
           indexInArray = px.y * imageWidth + px.x;
           angle = std::atan2(pDy[indexInArray], pDx[indexInArray]);
 #endif
+#if UPM_ABS_DIR_CHECKER == 1
+          grad_samples.push_back( std::cos(angle) );
+          grad_samples.push_back( std::sin(angle) );
+          grad_samples.push_back( std::sqrt(lerp_dx*lerp_dx+lerp_dy*lerp_dy) );
+          
+          if( std::abs( PI2PI( angle - theta ) ) > validationTh )
+          {
+            nOriOutliers++;
+          }
+          else 
+          {
+            nOriInliers++;
+          }
+#else           
           // Force theta to be in range [0, M_PI)
           if (angle < 0) angle += M_PI;
           if (angle >= M_PI) angle -= M_PI;
           circularDist(theta, angle, M_PI) > validationTh ? nOriOutliers++ : nOriInliers++;
+#endif
         }
 
+#if UPM_ABS_DIR_CHECKER == 1
+        int no_samples = nOriOutliers + nOriInliers;
+        if( no_samples < 2 )
+        {
+          valid = false;
+          saliency = 0;
+        }
+        else 
+        {
+          valid = true;
+          if( nOriOutliers > nOriInliers )
+          {
+            change_sp_ep = true;
+            theta = PI2PI( theta + M_PI );
+          }
+          
+          float sum_dx(0);
+          float sum_dy(0);
+          float sum_dxdy(0);
+          for( int i(0); i< grad_samples.size(); i+= 3 )
+          {
+            sum_dx += grad_samples[i+0] * grad_samples[i+2];
+            sum_dy += grad_samples[i+1] * grad_samples[i+2];
+            sum_dxdy += grad_samples[i+2];
+          }
+          
+          float mean_grad_angle = std::atan2( sum_dy, sum_dx );
+          float mean_angle_diff = PI2PI( mean_grad_angle - theta );
+          float sigma_angle = validationTh * 2.0f;
+          saliency = std::exp( -0.5f * mean_angle_diff * mean_angle_diff / sigma_angle / sigma_angle );
+          saliency = sum_dxdy / static_cast<float>(no_samples) / static_cast<float>( params.gradientThreshold * 10 );
+          valid = saliency > 0.05f;
+
+//           printf("[%c] s[%1.2f] N[%d] Ad[%+4.1f] nOriInliers = %3d, nOriOutliers = %3d \n", 
+//                  (valid ? 'O' : 'X'), 
+//                  saliency, 
+//                  no_samples, 
+//                  mean_angle_diff * 180.0f / M_PI,
+//                  nOriInliers, nOriOutliers ); 
+        }
+        
+#else
         valid = nOriInliers > nOriOutliers;
         saliency = nOriInliers;
+#endif
       }
-    } else {
+    } 
+    else 
+    {
+#if UPM_ABS_DIR_CHECKER == 1
+      saliency = 1;
+#else       
       saliency = segLength(detectedSeg.getEndpoints());
+#endif
     }
-    if (valid) {
+    
+    if( valid )  
+    {
+#if UPM_ABS_DIR_CHECKER == 1
+      Segment endpoints = detectedSeg.getEndpoints();
+      if( change_sp_ep )
+      {
+        std::swap( endpoints[0], endpoints[2] );
+        std::swap( endpoints[1], endpoints[3] );
+      }
+      segments.push_back(endpoints);
+      salientSegments.emplace_back(endpoints, saliency);
+#else
       const Segment &endpoints = detectedSeg.getEndpoints();
       segments.push_back(endpoints);
       salientSegments.emplace_back(endpoints, saliency);
+#endif
     }
   }
 }

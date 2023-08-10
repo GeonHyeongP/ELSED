@@ -14,7 +14,7 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 # Create the ELSED library
 set(LIB_SOURCES "src/EdgeDrawer.cpp" "src/ELSED.cpp" "src/FullSegmentInfo.cpp")
 include_directories(src)
-add_library(elsed ${LIB_SOURCES})
+add_library(elsed SHARED ${LIB_SOURCES})
 target_link_libraries(elsed ${OpenCV_LIBS})
 
 # ELSED executable demo
@@ -22,7 +22,17 @@ add_executable(elsed_main src/main.cpp)
 target_link_libraries(elsed_main elsed ${OpenCV_LIBS})
 
 # Create the python library using pybind11
-add_subdirectory(pybind11)
-pybind11_add_module(pyelsed src/PYAPI.cpp)
-target_link_libraries(pyelsed PRIVATE ${OpenCV_LIBS} elsed)
-target_compile_definitions(pyelsed PRIVATE VERSION_INFO=${EXAMPLE_VERSION_INFO})
+# add_subdirectory(pybind11)
+# pybind11_add_module(pyelsed src/PYAPI.cpp)
+# target_link_libraries(pyelsed PRIVATE ${OpenCV_LIBS} elsed)
+# target_compile_definitions(pyelsed PRIVATE VERSION_INFO=${EXAMPLE_VERSION_INFO})
+
+FILE(GLOB HEADERS src/*.h)
+
+message(STATUS "files " ${HEADERS} )
+
+set(DEPENDENCY_DIR ${CMAKE_CURRENT_BINARY_DIR}/dependencies)
+set(DEPENDENCY_INSTALL_DIR ${DEPENDENCY_DIR}/install)
+
+install( TARGETS elsed DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install( FILES src/EdgeDrawer.h src/ELSED.h src/FullSegmentInfo.h src/Utils.h  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/elsed )
