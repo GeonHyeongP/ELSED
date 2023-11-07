@@ -34,5 +34,5 @@ message(STATUS "files " ${HEADERS} )
 set(DEPENDENCY_DIR ${CMAKE_CURRENT_BINARY_DIR}/dependencies)
 set(DEPENDENCY_INSTALL_DIR ${DEPENDENCY_DIR}/install)
 
-install( TARGETS elsed DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install( FILES src/EdgeDrawer.h src/ELSED.h src/FullSegmentInfo.h src/Utils.h  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/elsed )
+install( TARGETS elsed DESTINATION lib)
+install( FILES src/EdgeDrawer.h src/ELSED.h src/FullSegmentInfo.h src/Utils.h  DESTINATION include/elsed )
